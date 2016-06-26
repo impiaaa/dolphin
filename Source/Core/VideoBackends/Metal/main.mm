@@ -46,7 +46,7 @@ namespace Metal
     return "Metal (experimental)";
   }
 
-  static void InitBackendInfo()
+  void VideoBackend::InitBackendInfo()
   {
     g_Config.backend_info.APIType = API_METAL;
     g_Config.backend_info.bSupportsExclusiveFullscreen = false;
@@ -82,43 +82,12 @@ namespace Metal
     g_Config.backend_info.AnaglyphShaders.clear();
   }
   
-  void VideoBackend::ShowConfig(void* parent_handle)
-  {
-    InitBackendInfo();
-    Host_ShowVideoConfig(parent_handle, GetDisplayName(), "gfx_metal");
-  }
-  
   bool VideoBackend::Initialize(void* window_handle)
   {
     InitializeShared();
     InitBackendInfo();
     
     frameCount = 0;
-    
-    // Load Configs
-    if (File::Exists(File::GetUserPath(D_CONFIG_IDX) + "GFX.ini"))
-      g_Config.Load(File::GetUserPath(D_CONFIG_IDX) + "GFX.ini");
-    else
-      g_Config.Load(File::GetUserPath(D_CONFIG_IDX) + "gfx_metal.ini");
-    g_Config.GameIniLoad();
-    g_Config.UpdateProjectionHack();
-    g_Config.VerifyValidity();
-    UpdateActiveConfig();
-    
-    // Do our OSD callbacks
-    OSD::DoCallbacks(OSD::CallbackType::Initialization);
-    
-    // Initialize VideoCommon
-    CommandProcessor::Init();
-    PixelEngine::Init();
-    BPInit();
-    Fifo::Init();
-    OpcodeDecoder::Init();
-    IndexGenerator::Init();
-    VertexShaderManager::Init();
-    PixelShaderManager::Init();
-    VertexLoaderManager::Init();
-    Host_Message(WM_USER_CREATE);
     
     if (!MetalInt::Create((NSView *)window_handle))
       return false;
@@ -144,19 +113,12 @@ namespace Metal
   
   void VideoBackend::Shutdown()
   {
-    // Shutdown VideoCommon
-    Fifo::Shutdown();
-    VertexLoaderManager::Shutdown();
-    VertexShaderManager::Shutdown();
-    PixelShaderManager::Shutdown();
-    OpcodeDecoder::Shutdown();
-    
-    // Do our OSD callbacks
-    OSD::DoCallbacks(OSD::CallbackType::Shutdown);
+    ShutdownShared();
   }
   
   void VideoBackend::Video_Cleanup()
   {
+    CleanupShared();
     PixelShaderCache::s_instance.reset();
     VertexShaderCache::s_instance.reset();
     GeometryShaderCache::s_instance.reset();

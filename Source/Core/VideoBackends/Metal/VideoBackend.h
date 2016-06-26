@@ -19,7 +19,7 @@ namespace Metal
     void Video_Prepare() override;
     void Video_Cleanup() override;
     
-    void ShowConfig(void* parent) override;
+    void InitBackendInfo() override;
     
     unsigned int PeekMessages() override;
   };

@@ -13,6 +13,7 @@
 #include "VideoBackends/Metal/TextureCache.h"
 #include "VideoBackends/Metal/VertexManager.h"
 #include "VideoBackends/Metal/VideoBackend.h"
+#include "VideoBackends/Metal/Interface.h"
 
 #include "VideoCommon/BPStructs.h"
 #include "VideoCommon/CommandProcessor.h"
@@ -118,6 +119,9 @@ namespace Metal
     PixelShaderManager::Init();
     VertexLoaderManager::Init();
     Host_Message(WM_USER_CREATE);
+    
+    if (!MetalInt::Create((NSView *)window_handle))
+      return false;
     
     m_initialized = true;
     

@@ -13,6 +13,9 @@
 #include "VideoBackends/D3D12/VideoBackend.h"
 #endif
 #include "VideoBackends/Null/VideoBackend.h"
+#ifdef __APPLE__
+#include "VideoBackends/Metal/VideoBackend.h"
+#endif
 #include "VideoBackends/OGL/VideoBackend.h"
 #include "VideoBackends/Software/VideoBackend.h"
 
@@ -47,6 +50,9 @@ void VideoBackendBase::PopulateList()
     FreeLibrary(d3d12_module);
     g_available_video_backends.push_back(std::make_unique<DX12::VideoBackend>());
   }
+#endif
+#ifdef __APPLE__
+  g_available_video_backends.push_back(std::make_unique<Metal::VideoBackend>());
 #endif
   g_available_video_backends.push_back(std::make_unique<SW::VideoSoftware>());
   g_available_video_backends.push_back(std::make_unique<Null::VideoBackend>());

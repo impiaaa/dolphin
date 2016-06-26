@@ -107,7 +107,11 @@ if(wxWidgets_FOUND)
 	target_link_libraries(${DOLPHIN_EXE} ${LIBS} ${WXLIBS})
 	if(APPLE)
 		include(BundleUtilities)
-		set(BUNDLE_PATH ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${DOLPHIN_EXE}.app)
+		if(CMAKE_GENERATOR STREQUAL "Xcode")
+			set(BUNDLE_PATH ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<CONFIG>/${DOLPHIN_EXE}.app)
+		else()
+			set(BUNDLE_PATH ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${DOLPHIN_EXE}.app)
+		endif()
 
 		# Ask for an application bundle.
 		set_target_properties(${DOLPHIN_EXE} PROPERTIES
@@ -123,17 +127,17 @@ if(wxWidgets_FOUND)
 			# so we invoke CMake again on a generated script.
 			file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/postprocess_bundle.cmake "
 				include(BundleUtilities)
-				message(\"Fixing up application bundle: ${BUNDLE_PATH}\")
+				message(\"Fixing up application bundle: \${BUNDLE_PATH}\")
 				message(\"(Note: This is only necessary to produce a redistributable binary.\")
 				message(\"To skip, pass -DSKIP_POSTPROCESS_BUNDLE=1 to cmake.)\")
 				set(BU_CHMOD_BUNDLE_ITEMS ON)
-				execute_process(COMMAND ${CMAKE_SOURCE_DIR}/Tools/deploy-mac.py \"${BUNDLE_PATH}\")
+				execute_process(COMMAND ${CMAKE_SOURCE_DIR}/Tools/deploy-mac.py \"\${BUNDLE_PATH}\")
 				file(INSTALL \"${CMAKE_SOURCE_DIR}/Data/Sys\"
-					DESTINATION \"${BUNDLE_PATH}/Contents/Resources\"
+					DESTINATION \"\${BUNDLE_PATH}/Contents/Resources\"
 					)
 				")
 			add_custom_command(TARGET ${DOLPHIN_EXE} POST_BUILD
-				COMMAND ${CMAKE_COMMAND} -P postprocess_bundle.cmake
+				COMMAND ${CMAKE_COMMAND} -DBUNDLE_PATH=${BUNDLE_PATH} -P postprocess_bundle.cmake
 				)
 		else()
 			add_custom_command(OUTPUT ${BUNDLE_PATH}/Contents/Resources/Sys

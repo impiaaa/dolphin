@@ -7,30 +7,57 @@
 
 #include "Common/Logging/Log.h"
 
-#include "VideoCommon/VideoConfig.h"
 #include "VideoBackends/Metal/Interface.h"
 
-namespace MetalInt {
-  bool Create(NSView *view) {
-    @try {
-      NSArray<id<MTLDevice>>* devices = MTLCopyAllDevices();
-      id<MTLDevice> device = devices[g_Config.iAdapter];
-      
-      CAMetalLayer *metalLayer = [CAMetalLayer layer];
-      metalLayer.device = device;
-      metalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
-      metalLayer.frame = view.bounds;
-      [view.layer addSublayer:metalLayer];
-      
-      [metalLayer release];
-      [device release];
-      [devices release];
-    }
-    @catch (NSException *exception) {
-      ERROR_LOG(VIDEO, "Got exception creating Metal view: %s", [[exception description] UTF8String]);
-      return false;
-    }
-    
-    return true;
-  }
+#include "VideoCommon/VideoConfig.h"
+
+namespace MetalInt
+{
+	
+	static id<MTLDevice> device = nullptr;
+	static id<MTLCommandQueue> command_queue = nullptr;
+	
+	bool Create(NSView *view)
+	{
+		
+		@try
+		{
+			NSArray<id<MTLDevice>>* devices = MTLCopyAllDevices();
+			device = devices[g_Config.iAdapter];
+			
+			CAMetalLayer* metal_layer = [CAMetalLayer layer];
+			metal_layer.device = device;
+			metal_layer.pixelFormat = MTLPixelFormatBGRA8Unorm;
+			metal_layer.frame = view.bounds;
+			[view.layer addSublayer:metal_layer];
+			
+			[devices release];
+			[metal_layer release];
+		}
+		@catch (NSException *exception)
+		{
+			ERROR_LOG(VIDEO, "Got exception creating Metal layer: %s",
+			          [[exception description] UTF8String]);
+			return false;
+		}
+		
+		command_queue = [device newCommandQueue];
+		if (!command_queue)
+		{
+			ERROR_LOG(VIDEO, "Could not create Metal command queue");
+			return false;
+		}
+		
+		return true;
+	}
+	
+	void Close()
+	{
+		[command_queue release];
+		command_queue = nullptr;
+		
+		[device release];
+		device = nullptr;
+	}
+	
 }

@@ -6,6 +6,8 @@
 
 #include <Cocoa/Cocoa.h>
 
-namespace MetalInt {
-  bool Create(NSView *);
+namespace MetalInt
+{
+	bool Create(NSView *);
+	void Close();
 }

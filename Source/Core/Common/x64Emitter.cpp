@@ -1046,8 +1046,14 @@ void XEmitter::MOVBE(int bits, const OpArg& dest, X64Reg src)
   WriteMOVBE(bits, 0xF1, src, dest);
 }
 
-void XEmitter::LoadAndSwap(int size, X64Reg dst, const OpArg& src, bool sign_extend)
+void XEmitter::LoadAndSwap(int size, X64Reg dst, const OpArg& src, bool sign_extend, MovInfo* info)
 {
+  if (info)
+  {
+    info->address = GetWritableCodePtr();
+    info->nonAtomicSwapStore = false;
+  }
+
   switch (size)
   {
   case 8:
@@ -1083,20 +1089,28 @@ void XEmitter::LoadAndSwap(int size, X64Reg dst, const OpArg& src, bool sign_ext
   }
 }
 
-u8* XEmitter::SwapAndStore(int size, const OpArg& dst, X64Reg src)
+void XEmitter::SwapAndStore(int size, const OpArg& dst, X64Reg src, MovInfo* info)
 {
-  u8* mov_location = GetWritableCodePtr();
   if (cpu_info.bMOVBE)
   {
+    if (info)
+    {
+      info->address = GetWritableCodePtr();
+      info->nonAtomicSwapStore = false;
+    }
     MOVBE(size, dst, src);
   }
   else
   {
     BSWAP(size, src);
-    mov_location = GetWritableCodePtr();
+    if (info)
+    {
+      info->address = GetWritableCodePtr();
+      info->nonAtomicSwapStore = true;
+      info->nonAtomicSwapStoreSrc = src;
+    }
     MOV(size, dst, R(src));
   }
-  return mov_location;
 }
 
 void XEmitter::LEA(int bits, X64Reg dest, OpArg src)
@@ -1526,6 +1540,13 @@ void XEmitter::XOR(int bits, const OpArg& a1, const OpArg& a2)
 }
 void XEmitter::MOV(int bits, const OpArg& a1, const OpArg& a2)
 {
+  // Shortcut to zero a register
+  if (a2.IsZero() && a1.IsSimpleReg() && !flags_locked)
+  {
+    XOR(bits, a1, a1);
+    return;
+  }
+
   if (a1.IsSimpleReg() && a2.IsSimpleReg() && a1.GetSimpleReg() == a2.GetSimpleReg())
     ERROR_LOG(DYNA_REC, "Redundant MOV @ %p - bug in JIT?", code);
   WriteNormalOp(bits, nrmMOV, a1, a2);
@@ -1556,6 +1577,76 @@ void XEmitter::CMP_or_TEST(int bits, const OpArg& a1, const OpArg& a2)
   {
     WriteNormalOp(bits, nrmCMP, a1, a2);
   }
+}
+
+void XEmitter::MOV_sum(int bits, X64Reg dest, const OpArg& a1, const OpArg& a2)
+{
+  // This stomps on flags, so ensure they aren't locked
+  _dbg_assert_(DYNA_REC, !flags_locked);
+
+  // Zero shortcuts (note that this can generate no code in the case where a1 == dest && a2 == zero
+  // or a2 == dest && a1 == zero)
+  if (a1.IsZero())
+  {
+    if (!a2.IsSimpleReg() || a2.GetSimpleReg() != dest)
+    {
+      MOV(bits, R(dest), a2);
+    }
+    return;
+  }
+  if (a2.IsZero())
+  {
+    if (!a1.IsSimpleReg() || a1.GetSimpleReg() != dest)
+    {
+      MOV(bits, R(dest), a1);
+    }
+    return;
+  }
+
+  // If dest == a1 or dest == a2 we can simplify this
+  if (a1.IsSimpleReg() && a1.GetSimpleReg() == dest)
+  {
+    ADD(bits, R(dest), a2);
+    return;
+  }
+
+  if (a2.IsSimpleReg() && a2.GetSimpleReg() == dest)
+  {
+    ADD(bits, R(dest), a1);
+    return;
+  }
+
+  // TODO: 32-bit optimizations may apply to other bit sizes (confirm)
+  if (bits == 32)
+  {
+    if (a1.IsImm() && a2.IsImm())
+    {
+      MOV(32, R(dest), Imm32(a1.Imm32() + a2.Imm32()));
+      return;
+    }
+
+    if (a1.IsSimpleReg() && a2.IsSimpleReg())
+    {
+      LEA(32, dest, MRegSum(a1.GetSimpleReg(), a2.GetSimpleReg()));
+      return;
+    }
+
+    if (a1.IsSimpleReg() && a2.IsImm())
+    {
+      LEA(32, dest, MDisp(a1.GetSimpleReg(), a2.Imm32()));
+      return;
+    }
+
+    if (a1.IsImm() && a2.IsSimpleReg())
+    {
+      LEA(32, dest, MDisp(a2.GetSimpleReg(), a1.Imm32()));
+      return;
+    }
+  }
+
+  // Fallback
+  MOV(bits, R(dest), a1);
+  ADD(bits, R(dest), a2);
 }
 
 void XEmitter::IMUL(int bits, X64Reg regOp, const OpArg& a1, const OpArg& a2)

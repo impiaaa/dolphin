@@ -203,6 +203,15 @@ enum FloatOp
 
 class XEmitter;
 
+// Information about a generated MOV op
+struct MovInfo final
+{
+  u8* address;
+  bool nonAtomicSwapStore;
+  // valid iff nonAtomicSwapStore is true
+  X64Reg nonAtomicSwapStoreSrc;
+};
+
 // RIP addressing does not benefit from micro op fusion on Core arch
 struct OpArg
 {
@@ -272,6 +281,27 @@ struct OpArg
     return (s8)offset;
   }
 
+  OpArg AsImm64() const
+  {
+    _dbg_assert_(DYNA_REC, IsImm());
+    return OpArg((u64)offset, SCALE_IMM64);
+  }
+  OpArg AsImm32() const
+  {
+    _dbg_assert_(DYNA_REC, IsImm());
+    return OpArg((u32)offset, SCALE_IMM32);
+  }
+  OpArg AsImm16() const
+  {
+    _dbg_assert_(DYNA_REC, IsImm());
+    return OpArg((u16)offset, SCALE_IMM16);
+  }
+  OpArg AsImm8() const
+  {
+    _dbg_assert_(DYNA_REC, IsImm());
+    return OpArg((u8)offset, SCALE_IMM8);
+  }
+
   void WriteNormalOp(XEmitter* emit, bool toRM, NormalOp op, const OpArg& operand, int bits) const;
   bool IsImm() const
   {
@@ -280,6 +310,7 @@ struct OpArg
   }
   bool IsSimpleReg() const { return scale == SCALE_NONE; }
   bool IsSimpleReg(X64Reg reg) const { return IsSimpleReg() && GetSimpleReg() == reg; }
+  bool IsZero() const { return IsImm() && offset == 0; }
   int GetImmBits() const
   {
     switch (scale)
@@ -609,6 +640,7 @@ public:
   void TEST(int bits, const OpArg& a1, const OpArg& a2);
 
   void CMP_or_TEST(int bits, const OpArg& a1, const OpArg& a2);
+  void MOV_sum(int bits, X64Reg dest, const OpArg& a1, const OpArg& a2);
 
   // Are these useful at all? Consider removing.
   void XCHG(int bits, const OpArg& a1, const OpArg& a2);
@@ -625,8 +657,9 @@ public:
   // Available only on Atom or >= Haswell so far. Test with cpu_info.bMOVBE.
   void MOVBE(int bits, X64Reg dest, const OpArg& src);
   void MOVBE(int bits, const OpArg& dest, X64Reg src);
-  void LoadAndSwap(int size, X64Reg dst, const OpArg& src, bool sign_extend = false);
-  u8* SwapAndStore(int size, const OpArg& dst, X64Reg src);
+  void LoadAndSwap(int size, X64Reg dst, const OpArg& src, bool sign_extend = false,
+                   MovInfo* info = nullptr);
+  void SwapAndStore(int size, const OpArg& dst, X64Reg src, MovInfo* info = nullptr);
 
   // Available only on AMD >= Phenom or Intel >= Haswell
   void LZCNT(int bits, X64Reg dest, const OpArg& src);

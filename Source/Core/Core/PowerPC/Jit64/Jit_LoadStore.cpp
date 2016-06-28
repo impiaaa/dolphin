@@ -236,27 +236,9 @@ void Jit64::lXXx(UGeckoInstruction inst)
         opAddress = R(RSCRATCH2);
         storeAddress = true;
         if (use_constant_offset)
-        {
-          if (gpr.R(a).IsSimpleReg() && offset != 0)
-          {
-            LEA(32, RSCRATCH2, MDisp(gpr.RX(a), offset));
-          }
-          else
-          {
-            MOV(32, opAddress, gpr.R(a));
-            if (offset != 0)
-              ADD(32, opAddress, Imm32((u32)offset));
-          }
-        }
-        else if (gpr.R(a).IsSimpleReg() && gpr.R(b).IsSimpleReg())
-        {
-          LEA(32, RSCRATCH2, MRegSum(gpr.RX(a), gpr.RX(b)));
-        }
+          MOV_sum(32, RSCRATCH2, gpr.R(a), Imm32((u32)offset));
         else
-        {
-          MOV(32, opAddress, gpr.R(a));
-          ADD(32, opAddress, gpr.R(b));
-        }
+          MOV_sum(32, RSCRATCH2, gpr.R(a), gpr.R(b));
       }
     }
   }
@@ -287,17 +269,11 @@ void Jit64::lXXx(UGeckoInstruction inst)
   SafeLoadToReg(gpr.RX(d), opAddress, accessSize, loadOffset, registersInUse, signExtend);
 
   if (update && storeAddress)
-  {
-    MemoryExceptionCheck();
     MOV(32, gpr.R(a), opAddress);
-  }
 
   // TODO: support no-swap in SafeLoadToReg instead
   if (byte_reversed)
-  {
-    MemoryExceptionCheck();
     BSWAP(accessSize, gpr.RX(d));
-  }
 
   gpr.UnlockAll();
   gpr.UnlockAllX();
@@ -313,16 +289,7 @@ void Jit64::dcbx(UGeckoInstruction inst)
   X64Reg tmp = gpr.GetFreeXReg();
   gpr.FlushLockX(tmp);
 
-  if (inst.RA && gpr.R(inst.RA).IsSimpleReg() && gpr.R(inst.RB).IsSimpleReg())
-  {
-    LEA(32, addr, MRegSum(gpr.RX(inst.RA), gpr.RX(inst.RB)));
-  }
-  else
-  {
-    MOV(32, R(addr), gpr.R(inst.RB));
-    if (inst.RA)
-      ADD(32, R(addr), gpr.R(inst.RA));
-  }
+  MOV_sum(32, addr, inst.RA ? gpr.R(inst.RA) : Imm32(0), gpr.R(inst.RB));
 
   // Check whether a JIT cache line needs to be invalidated.
   LEA(32, value, MScaled(addr, SCALE_8, 0));  // addr << 3 (masks the first 3 bits)
@@ -507,10 +474,7 @@ void Jit64::stX(UGeckoInstruction inst)
     }
 
     if (update)
-    {
-      MemoryExceptionCheck();
       ADD(32, gpr.R(a), Imm32((u32)offset));
-    }
   }
   gpr.UnlockAll();
 }
@@ -530,15 +494,7 @@ void Jit64::stXx(UGeckoInstruction inst)
   if (update)
     gpr.BindToRegister(a, true, true);
 
-  if (gpr.R(a).IsSimpleReg() && gpr.R(b).IsSimpleReg())
-  {
-    LEA(32, RSCRATCH2, MRegSum(gpr.RX(a), gpr.RX(b)));
-  }
-  else
-  {
-    MOV(32, R(RSCRATCH2), gpr.R(a));
-    ADD(32, R(RSCRATCH2), gpr.R(b));
-  }
+  MOV_sum(32, RSCRATCH2, gpr.R(a), gpr.R(b));
 
   int accessSize;
   switch (inst.SUBOP10 & ~32)
@@ -589,10 +545,7 @@ void Jit64::stXx(UGeckoInstruction inst)
   }
 
   if (update)
-  {
-    MemoryExceptionCheck();
     MOV(32, gpr.R(a), R(RSCRATCH2));
-  }
 
   gpr.UnlockAll();
   gpr.UnlockAllX();

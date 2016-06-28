@@ -14,8 +14,8 @@
 namespace MetalInt
 {
 	
-	static id<MTLDevice> device = nullptr;
-	static id<MTLCommandQueue> command_queue = nullptr;
+	id<MTLDevice> device = nullptr;
+	id<MTLCommandQueue> command_queue = nullptr;
 	
 	bool Create(NSView *view)
 	{

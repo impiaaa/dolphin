@@ -1,9 +1,10 @@
 set(SRCS
-	Render.cpp
-	VertexManager.cpp
-	ShaderCache.cpp
 	Interface.mm
-	main.mm)
+	main.mm
+	Render.cpp
+	ShaderCache.cpp
+	StreamBuffer.cpp
+	VertexManager.cpp)
 
 find_library(METAL_FRAMEWORK Metal)
 find_library(QC_FRAMEWORK QuartzCore)

@@ -5,9 +5,13 @@
 #pragma once
 
 #include <Cocoa/Cocoa.h>
+#include <Metal/Metal.h>
 
 namespace MetalInt
 {
+	extern id<MTLDevice> device;
+	extern id<MTLCommandQueue> command_queue;
+	
 	bool Create(NSView *);
 	void Close();
 }

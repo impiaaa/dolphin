@@ -138,13 +138,13 @@ NetPlaySetupFrame::NetPlaySetupFrame(wxWindow* const parent, const CGameListCtrl
           "If DSP LLE is used, DSP ROMs must be identical between players.\n"
           "If connecting directly, the host must have the chosen UDP port open/forwarded!\n"
           "\n"
-          "Wiimote support is broken in netplay and therefore disabled.\n"));
+          "Wiimote netplay is experimental and should not be expected to work.\n"));
 
     wxBoxSizer* const top_szr = new wxBoxSizer(wxHORIZONTAL);
 
-    top_szr->Add(m_ip_lbl, 0, wxCENTER | wxRIGHT, 5);
+    top_szr->Add(m_ip_lbl, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 5);
     top_szr->Add(m_connect_ip_text, 3);
-    top_szr->Add(m_client_port_lbl, 0, wxCENTER | wxRIGHT | wxLEFT, 5);
+    top_szr->Add(m_client_port_lbl, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxLEFT, 5);
     top_szr->Add(m_connect_port_text, 1);
 
     wxBoxSizer* const con_szr = new wxBoxSizer(wxVERTICAL);
@@ -195,7 +195,7 @@ NetPlaySetupFrame::NetPlaySetupFrame(wxWindow* const parent, const CGameListCtrl
     top_szr->Add(m_host_port_text, 0);
 #ifdef USE_UPNP
     m_upnp_chk = new wxCheckBox(host_tab, wxID_ANY, _("Forward port (UPnP)"));
-    top_szr->Add(m_upnp_chk, 0, wxALL | wxALIGN_RIGHT, 5);
+    top_szr->Add(m_upnp_chk, 0, wxALL, 5);
 #endif
     wxBoxSizer* const bottom_szr = new wxBoxSizer(wxHORIZONTAL);
     bottom_szr->Add(m_traversal_listen_port_enabled, 0, wxCENTER | wxLEFT, 5);

@@ -3,15 +3,13 @@
 // Refer to the license.txt file included.
 
 #include <algorithm>
+#include <cstring>
 
-#include "Common/Assert.h"
-#include "Core/Core.h"
-#include "Core/FifoPlayer/FifoAnalyzer.h"
 #include "Core/FifoPlayer/FifoRecordAnalyzer.h"
+
+#include "Core/FifoPlayer/FifoAnalyzer.h"
 #include "Core/FifoPlayer/FifoRecorder.h"
 #include "Core/HW/Memmap.h"
-#include "VideoCommon/OpcodeDecoding.h"
-#include "VideoCommon/TextureDecoder.h"
 
 using namespace FifoAnalyzer;
 
@@ -38,7 +36,7 @@ void FifoRecordAnalyzer::ProcessLoadIndexedXf(u32 val, int array)
   FifoRecorder::GetInstance().UseMemory(address, size * 4, MemoryUpdate::XF_DATA);
 }
 
-void FifoRecordAnalyzer::WriteVertexArray(int arrayIndex, u8* vertexData, int vertexSize,
+void FifoRecordAnalyzer::WriteVertexArray(int arrayIndex, const u8* vertexData, int vertexSize,
                                           int numVertices)
 {
   // Skip if not indexed array

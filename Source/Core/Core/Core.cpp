@@ -73,15 +73,11 @@
 #include "VideoCommon/RenderBase.h"
 #include "VideoCommon/VideoBackendBase.h"
 
-// This can mostly be removed when we move to VS2015
-// to use the thread_local keyword
-#ifdef _MSC_VER
-#define ThreadLocalStorage __declspec(thread)
-#elif defined __ANDROID__ || defined __APPLE__
-// This will most likely have to stay, to support android
+// Android and OSX haven't implemented the keyword yet.
+#if defined __ANDROID__ || defined __APPLE__
 #include <pthread.h>
-#else  // Everything besides VS and Android
-#define ThreadLocalStorage __thread
+#else  // Everything besides OSX and Android
+#define ThreadLocalStorage thread_local
 #endif
 
 namespace Core
@@ -533,7 +529,9 @@ void EmuThread()
   if (core_parameter.bWii)
   {
     if (init_controllers)
-      Wiimote::Initialize(s_window_handle, !s_state_filename.empty());
+      Wiimote::Initialize(s_window_handle, !s_state_filename.empty() ?
+                                               Wiimote::InitializeMode::DO_WAIT_FOR_WIIMOTES :
+                                               Wiimote::InitializeMode::DO_NOT_WAIT_FOR_WIIMOTES);
     else
       Wiimote::LoadConfig();
 
@@ -901,13 +899,12 @@ void UpdateTitle()
   std::string SFPS;
 
   if (Movie::IsPlayingInput())
-    SFPS = StringFromFormat("VI: %u/%u - Input: %u/%u - FPS: %.0f - VPS: %.0f - %.0f%%",
-                            (u32)Movie::g_currentFrame, (u32)Movie::g_totalFrames,
-                            (u32)Movie::g_currentInputCount, (u32)Movie::g_totalInputCount, FPS,
-                            VPS, Speed);
+    SFPS = StringFromFormat("Input: %u/%u - VI: %u - FPS: %.0f - VPS: %.0f - %.0f%%",
+                            (u32)Movie::g_currentInputCount, (u32)Movie::g_totalInputCount,
+                            (u32)Movie::g_currentFrame, FPS, VPS, Speed);
   else if (Movie::IsRecordingInput())
-    SFPS = StringFromFormat("VI: %u - Input: %u - FPS: %.0f - VPS: %.0f - %.0f%%",
-                            (u32)Movie::g_currentFrame, (u32)Movie::g_currentInputCount, FPS, VPS,
+    SFPS = StringFromFormat("Input: %u - VI: %u - FPS: %.0f - VPS: %.0f - %.0f%%",
+                            (u32)Movie::g_currentInputCount, (u32)Movie::g_currentFrame, FPS, VPS,
                             Speed);
   else
   {
@@ -976,8 +973,7 @@ void UpdateWantDeterminism(bool initial)
   // For now, this value is not itself configurable.  Instead, individual
   // settings that depend on it, such as GPU determinism mode. should have
   // override options for testing,
-  bool new_want_determinism =
-      Movie::IsPlayingInput() || Movie::IsRecordingInput() || NetPlay::IsNetPlayRunning();
+  bool new_want_determinism = Movie::IsMovieActive() || NetPlay::IsNetPlayRunning();
   if (new_want_determinism != g_want_determinism || initial)
   {
     WARN_LOG(COMMON, "Want determinism <- %s", new_want_determinism ? "true" : "false");

@@ -34,6 +34,8 @@
 #include "Core/NetPlayProto.h"
 #include "Core/NetPlayServer.h"
 
+#include "DiscIO/Enums.h"
+
 #include "DolphinWX/Frame.h"
 #include "DolphinWX/GameListCtrl.h"
 #include "DolphinWX/ISOFile.h"
@@ -69,7 +71,7 @@ static wxString FailureReasonStringForHostLabel(int reason)
 static std::string BuildGameName(const GameListItem& game)
 {
   // Lang needs to be consistent
-  DiscIO::IVolume::ELanguage const lang = DiscIO::IVolume::LANGUAGE_ENGLISH;
+  const DiscIO::Language lang = DiscIO::Language::LANGUAGE_ENGLISH;
   std::vector<std::string> info;
   if (!game.GetUniqueID().empty())
     info.push_back(game.GetUniqueID());
@@ -274,6 +276,7 @@ void NetPlayDialog::GetNetSettings(NetSettings& settings)
   SConfig& instance = SConfig::GetInstance();
   settings.m_CPUthread = instance.bCPUThread;
   settings.m_CPUcore = instance.iCPUCore;
+  settings.m_EnableCheats = instance.bEnableCheats;
   settings.m_SelectedLanguage = instance.SelectedLanguage;
   settings.m_OverrideGCLanguage = instance.bOverrideGCLanguage;
   settings.m_ProgressiveScan = instance.bProgressive;
@@ -287,19 +290,33 @@ void NetPlayDialog::GetNetSettings(NetSettings& settings)
   settings.m_EXIDevice[1] = instance.m_EXIDevice[1];
 }
 
-std::string NetPlayDialog::FindGame()
+std::string NetPlayDialog::FindGame(const std::string& target_game)
 {
   // find path for selected game, sloppy..
   for (u32 i = 0; auto game = m_game_list->GetISO(i); ++i)
-    if (m_selected_game == BuildGameName(*game))
+    if (target_game == BuildGameName(*game))
       return game->GetFileName();
 
-  WxUtils::ShowErrorDialog(_("Game not found!"));
   return "";
+}
+
+std::string NetPlayDialog::FindCurrentGame()
+{
+  return FindGame(m_selected_game);
 }
 
 void NetPlayDialog::OnStart(wxCommandEvent&)
 {
+  bool should_start = true;
+  if (!netplay_client->DoAllPlayersHaveGame())
+  {
+    should_start = wxMessageBox(_("Not all players have the game. Do you really want to start?"),
+                                _("Warning"), wxYES_NO) == wxYES;
+  }
+
+  if (!should_start)
+    return;
+
   NetSettings settings;
   GetNetSettings(settings);
   netplay_server->SetNetSettings(settings);
@@ -441,7 +458,11 @@ void NetPlayDialog::OnThread(wxThreadEvent& event)
   case NP_GUI_EVT_START_GAME:
     // client start game :/
     {
-      netplay_client->StartGame(FindGame());
+      std::string game = FindCurrentGame();
+      if (game.empty())
+        WxUtils::ShowErrorDialog(_("Game not found!"));
+      else
+        netplay_client->StartGame(game);
     }
     break;
   case NP_GUI_EVT_STOP_GAME:
@@ -482,6 +503,7 @@ void NetPlayDialog::OnAssignPads(wxCommandEvent&)
   pmd.ShowModal();
 
   netplay_server->SetPadMapping(pmd.GetModifiedPadMappings());
+  netplay_server->SetWiimoteMapping(pmd.GetModifiedWiimoteMappings());
 }
 
 void NetPlayDialog::OnKick(wxCommandEvent&)

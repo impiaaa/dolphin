@@ -22,7 +22,7 @@
 #include "Core/DSP/DSPCore.h"
 #include "Core/HW/CPU.h"
 #include "Core/HW/DVDInterface.h"
-#include "Core/HW/EXI_Device.h"
+#include "Core/HW/EXI_DeviceIPL.h"
 #include "Core/HW/ProcessorInterface.h"
 #include "Core/HW/SI.h"
 #include "Core/HW/Wiimote.h"
@@ -31,10 +31,10 @@
 #include "Core/IPC_HLE/WII_IPC_HLE_Device_usb.h"
 #include "Core/IPC_HLE/WII_IPC_HLE_WiiMote.h"
 #include "Core/Movie.h"
-#include "Core/NetPlayClient.h"
 #include "Core/NetPlayProto.h"
 #include "Core/PowerPC/PowerPC.h"
 #include "Core/State.h"
+#include "DiscIO/Enums.h"
 #include "InputCommon/GCPadStatus.h"
 #include "VideoCommon/Fifo.h"
 #include "VideoCommon/VideoBackendBase.h"
@@ -83,7 +83,7 @@ static u8 s_bongos, s_memcards;
 static u8 s_revision[20];
 static u32 s_DSPiromHash = 0;
 static u32 s_DSPcoefHash = 0;
-static u8 s_language = 10;  // Set to unknown until language is known
+static u8 s_language = static_cast<u8>(DiscIO::Language::LANGUAGE_UNKNOWN);
 
 static bool s_bRecordingFromSaveState = false;
 static bool s_bPolled = false;
@@ -315,7 +315,7 @@ void SetReadOnly(bool bEnabled)
 void FrameSkipping()
 {
   // Frameskipping will desync movie playback
-  if (!IsMovieActive() || NetPlay::IsNetPlayRunning())
+  if (!Core::g_want_determinism)
   {
     std::lock_guard<std::mutex> lk(cs_frameSkip);
 
@@ -516,7 +516,7 @@ bool BeginRecordingInput(int controllers)
   if (NetPlay::IsNetPlayRunning())
   {
     s_bNetPlay = true;
-    s_recordingStartTime = g_netplay_initial_gctime;
+    s_recordingStartTime = CEXIIPL::NetPlay_GetGCTime();
   }
   else
   {
@@ -1035,10 +1035,10 @@ void LoadInput(const std::string& filename)
     {
       afterEnd = true;
       PanicAlertT("Warning: You loaded a save that's after the end of the current movie. (byte %u "
-                  "> %u) (frame %u > %u). You should load another save before continuing, or load "
+                  "> %u) (input %u > %u). You should load another save before continuing, or load "
                   "this state with read-only mode off.",
-                  (u32)s_currentByte + 256, (u32)s_totalBytes + 256, (u32)g_currentFrame,
-                  (u32)g_totalFrames);
+                  (u32)s_currentByte + 256, (u32)s_totalBytes + 256, (u32)g_currentInputCount,
+                  (u32)g_totalInputCount);
     }
     else if (s_currentByte > 0 && s_totalBytes > 0)
     {
@@ -1134,7 +1134,7 @@ void LoadInput(const std::string& filename)
 // NOTE: CPU Thread
 static void CheckInputEnd()
 {
-  if (g_currentFrame > g_totalFrames || s_currentByte >= s_totalBytes ||
+  if (s_currentByte >= s_totalBytes ||
       (CoreTiming::GetTicks() > s_totalTickCount && !IsRecordingInputFromSaveState()))
   {
     EndPlayInput(!s_bReadOnly);
@@ -1211,17 +1211,15 @@ void PlayController(GCPadStatus* PadStatus, int controllerID)
     PadStatus->button |= PAD_TRIGGER_R;
   if (s_padState.disc)
   {
-    // This implementation assumes the disc change will only happen once. Trying to change more than
-    // that will cause
-    // it to load the last disc every time. As far as i know though, there are no 3+ disc games, so
-    // this should be fine.
-    CPU::Break();
+    // This implementation assumes the disc change will only happen once. Trying
+    // to change more than that will cause it to load the last disc every time.
+    // As far as I know, there are no 3+ disc games, so this should be fine.
     bool found = false;
     std::string path;
-    for (size_t i = 0; i < SConfig::GetInstance().m_ISOFolder.size(); ++i)
+    for (const std::string& iso_folder : SConfig::GetInstance().m_ISOFolder)
     {
-      path = SConfig::GetInstance().m_ISOFolder[i];
-      if (File::Exists(path + '/' + g_discChange))
+      path = iso_folder + '/' + g_discChange;
+      if (File::Exists(path))
       {
         found = true;
         break;
@@ -1229,18 +1227,11 @@ void PlayController(GCPadStatus* PadStatus, int controllerID)
     }
     if (found)
     {
-      path += '/' + g_discChange;
-
-      Core::QueueHostJob([=] {
-        if (!Movie::IsPlayingInput())
-          return;
-
-        DVDInterface::ChangeDisc(path);
-        CPU::EnableStepping(false);
-      });
+      DVDInterface::ChangeDiscAsCPU(path);
     }
     else
     {
+      CPU::Break();
       PanicAlertT("Change the disc to %s", g_discChange.c_str());
     }
   }

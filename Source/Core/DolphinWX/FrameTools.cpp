@@ -495,11 +495,11 @@ wxString CFrame::GetMenuLabel(int Id)
     break;
 
   case HK_SAVE_STATE_SLOT_SELECTED:
-    Label = _("Save state to selected slot");
+    Label = _("Save State to Selected Slot");
     break;
 
   case HK_LOAD_STATE_SLOT_SELECTED:
-    Label = _("Load state from selected slot");
+    Label = _("Load State from Selected Slot");
     break;
 
   case HK_SELECT_STATE_SLOT_1:
@@ -554,7 +554,7 @@ void CFrame::PopulateToolbar(wxToolBar* ToolBar)
 // Delete and recreate the toolbar
 void CFrame::RecreateToolbar()
 {
-  static const long TOOLBAR_STYLE = wxTB_DEFAULT_STYLE | wxTB_TEXT;
+  static const long TOOLBAR_STYLE = wxTB_DEFAULT_STYLE | wxTB_TEXT | wxTB_FLAT;
 
   if (m_ToolBar != nullptr)
   {
@@ -691,7 +691,7 @@ void CFrame::DoOpen(bool Boot)
   }
   else
   {
-    DVDInterface::ChangeDisc(WxStrToStr(path));
+    DVDInterface::ChangeDiscAsHost(WxStrToStr(path));
   }
 }
 
@@ -1034,6 +1034,13 @@ void CFrame::StartGame(const std::string& filename)
                                    X11Utils::XWindowFromHandle(GetHandle()), true);
 #endif
 
+#ifdef _WIN32
+    // Prevents Windows from sleeping, turning off the display, or idling
+    EXECUTION_STATE shouldScreenSave =
+        SConfig::GetInstance().bDisableScreenSaver ? ES_DISPLAY_REQUIRED : 0;
+    SetThreadExecutionState(ES_CONTINUOUS | shouldScreenSave | ES_SYSTEM_REQUIRED);
+#endif
+
     m_RenderParent->SetFocus();
 
     wxTheApp->Bind(wxEVT_KEY_DOWN, &CFrame::OnKeyDown, this);
@@ -1181,6 +1188,12 @@ void CFrame::OnStopped()
     X11Utils::InhibitScreensaver(X11Utils::XDisplayFromHandle(GetHandle()),
                                  X11Utils::XWindowFromHandle(GetHandle()), false);
 #endif
+
+#ifdef _WIN32
+  // Allow windows to resume normal idling behavior
+  SetThreadExecutionState(ES_CONTINUOUS);
+#endif
+
   m_RenderFrame->SetTitle(StrToWxStr(scm_rev_str));
 
   // Destroy the renderer frame when not rendering to main
